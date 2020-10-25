@@ -1,0 +1,13 @@
+﻿<Window x:Class="Minesweeper.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Minesweeper"
+        mc:Ignorable="d"
+        Title="Minesweeper" Height="460" Width="420" ResizeMode="NoResize">
+    <Grid>
+        <Canvas x:Name="CanvasElement" Height="400" Width="400" MouseLeftButtonDown="Canvas_MouseDown" Background="White" Margin="10,24,10,10"/>
+        <Button Content="Restart" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Click="Restart_Click" />
+    </Grid>
+</Window>
