@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,135 +13,61 @@ namespace Minesweeper
     /// </summary>
     public partial class MainWindow : Window
     {
-        public const int SizeX = 13;
-        public const int SizeY = 13;
-
         public int XUnit;
         public int YUnit;
 
-        public bool IsRunning = true;
-
-        public int[][] MinesMap = new int[SizeY][];
-        public int[][] NumbersMap = new int[SizeY][];
-        public int[][] VisibleMap = new int[SizeY][];
+        public MinesweeperGame ActiveGame { get; set; }
 
         public MainWindow()
         {
-            InitializeComponent();
-            XUnit = (int)CanvasElement.Width / SizeX;
-            YUnit = (int)CanvasElement.Height / SizeY;
+            ActiveGame = new MinesweeperGame()
+            {
+                OneGameEnd = gameResult =>
+                {
+                    DrawMap();
+                    DrawMines();
+                    if (gameResult == GameResult.Win)
+                    {
+                        MessageBox.Show("Win!");
+                    }
+                    else if (gameResult == GameResult.Loose)
+                    {
+                        MessageBox.Show("Loose!");
+                    }
+                }
+            };
 
-        GenerateMap();
+            InitializeComponent();
+            XUnit = (int)CanvasElement.Width / ActiveGame.SizeX;
+            YUnit = (int)CanvasElement.Height / ActiveGame.SizeY;
+
+            ActiveGame.Initialize();
             DrawMap();
         }
 
         public void Canvas_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (!IsRunning)
+            if (!ActiveGame.IsRunning)
             {
                 return;
             }
 
             var clickedPoint = Mouse.GetPosition(CanvasElement);
 
-            var y = (int)(clickedPoint.Y * SizeY / CanvasElement.Height);
-            var x = (int)(clickedPoint.X * SizeX / CanvasElement.Width);
-            VisibleMap[y][x] = 1;
+            var y = (int)(clickedPoint.Y * ActiveGame.SizeY / CanvasElement.Height);
+            var x = (int)(clickedPoint.X * ActiveGame.SizeX / CanvasElement.Width);
 
-            if (MinesMap[y][x] == 1)
+            ActiveGame.MakeGuess(y, x);
+
+            if (ActiveGame.IsRunning)
             {
-                IsRunning = false;
                 DrawMap();
-                DrawMines();
-                MessageBox.Show("Lost!");
-                return;
             }
-
-            if (isWin())
-            {
-                IsRunning = false;
-                DrawMap();
-                DrawMines();
-                MessageBox.Show("Win!");
-                return;
-            }
-
-            var closestSquares = new List<(int y, int x)>();
-
-            for (int di = -1; di <= 1; di++)
-            {
-                for (int dj = -1; dj <= 1; dj++)
-                {
-                    if (y + di >= 0 && y + di < SizeY && x + dj >= 0 && x + dj < SizeX
-                        && MinesMap[y + di][x + dj] == 0 && NumbersMap[y + di][x + dj] == 0)
-                    {
-                        closestSquares.Add((y + di, x + dj));
-                    }
-                }
-            }
-
-            foreach (var square in closestSquares)
-            {
-                var closedEmptySquares = GetClosedEmptySquares(square.y, square.x);
-
-                foreach (var closedEmptySquare in closedEmptySquares)
-                {
-                    VisibleMap[closedEmptySquare.y][closedEmptySquare.x] = 1;
-                }
-
-                VisibleMap[square.y][square.x] = 1;
-            }
-
-            DrawMap();
-        }
-
-        public bool isWin()
-        {
-            for (var i = 0; i < SizeY; i++)
-            {
-                for (var j = 0; j < SizeX; j++)
-                {
-                    if (VisibleMap[i][j] == 0 ^ MinesMap[i][j] == 1)
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return true;
-        }
-
-        private List<(int y, int x)> GetClosedEmptySquares(int y, int x, List<(int y, int x)> visited = null)
-        {
-            visited = visited ?? new List<(int, int)>();
-            var output = new List<(int, int)>();
-
-            if (MinesMap[y][x] == 1 || NumbersMap[y][x] != 0)
-            {
-                return output;
-            }
-
-            for (int dy = -1; dy <= 1; dy++)
-            {
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    if (y + dy >= 0 && y + dy < SizeY && x + dx >= 0 && x + dx < SizeX
-                        && !visited.Any(v => v.y == y + dy && v.x == x + dx))
-                    {
-                        visited.Add((y + dy, x + dx));
-                        output.Add((y + dy, x + dx));
-                        output.AddRange(GetClosedEmptySquares(y + dy, x + dx, visited));
-                    }
-                }
-            }
-
-            return output;
         }
 
         public void Restart_Click(object sender, RoutedEventArgs e)
         {
-            IsRunning = true;
-            GenerateMap();
+            ActiveGame.Initialize();
             DrawMap();
         }
 
@@ -153,11 +78,11 @@ namespace Minesweeper
             DrawMines();
 
             // draw invisible map's parts
-            for (var i = 0; i < SizeY; i++)
+            for (var i = 0; i < ActiveGame.SizeY; i++)
             {
-                for (var j = 0; j < SizeX; j++)
+                for (var j = 0; j < ActiveGame.SizeX; j++)
                 {
-                    if (VisibleMap[i][j] != 1)
+                    if (ActiveGame.VisibleMap[i][j] != 1)
                     {
                         var invisibleBlock = new Rectangle()
                         {
@@ -175,7 +100,7 @@ namespace Minesweeper
             }
 
             // draw vertical lines
-            for (var i = 0; i <= SizeY; i++)
+            for (var i = 0; i <= ActiveGame.SizeY; i++)
             {
                 var line = new Line()
                 {
@@ -184,21 +109,21 @@ namespace Minesweeper
                     X1 = i * XUnit,
                     X2 = i * XUnit,
                     Y1 = 0,
-                    Y2 = YUnit * SizeY,
+                    Y2 = YUnit * ActiveGame.SizeY,
                 };
 
                 CanvasElement.Children.Add(line);
             }
 
             // draw horizontal lines
-            for (var i = 0; i <= SizeX; i++)
+            for (var i = 0; i <= ActiveGame.SizeX; i++)
             {
                 var line = new Line()
                 {
                     StrokeThickness = 1,
                     Stroke = new SolidColorBrush(Colors.Black),
                     X1 = 0,
-                    X2 = XUnit * SizeX,
+                    X2 = XUnit * ActiveGame.SizeX,
                     Y1 = i * YUnit,
                     Y2 = i * YUnit,
                 };
@@ -211,11 +136,11 @@ namespace Minesweeper
         {
             // draw mines/numbers
             var mineMargin = 12;
-            for (var i = 0; i < SizeY; i++)
+            for (var i = 0; i < ActiveGame.SizeY; i++)
             {
-                for (var j = 0; j < SizeX; j++)
+                for (var j = 0; j < ActiveGame.SizeX; j++)
                 {
-                    if (MinesMap[i][j] == 1)
+                    if (ActiveGame.MinesMap[i][j] == 1)
                     {
                         var mine = new Rectangle()
                         {
@@ -229,11 +154,11 @@ namespace Minesweeper
 
                         CanvasElement.Children.Add(mine);
                     }
-                    else if (NumbersMap[i][j] != 0)
+                    else if (ActiveGame.NumbersMap[i][j] != 0)
                     {
                         var number = new TextBlock()
                         {
-                            Text = NumbersMap[i][j].ToString(),
+                            Text = ActiveGame.NumbersMap[i][j].ToString(),
                             Foreground = new SolidColorBrush(Colors.Blue),
                             FontSize = 20
                         };
@@ -241,58 +166,6 @@ namespace Minesweeper
                         Canvas.SetTop(number, i * YUnit);
                         Canvas.SetLeft(number, j * XUnit + mineMargin);
                         CanvasElement.Children.Add(number);
-                    }
-                }
-            }
-        }
-
-        public void GenerateMap()
-        {
-            // reset visibility
-            for (var i = 0; i < SizeY; i++)
-            {
-                VisibleMap[i] = new int[SizeX];
-            }
-
-            // generate mines
-            for (var i = 0; i < SizeY; i++)
-            {
-                MinesMap[i] = new int[SizeX];
-
-                for (var j = 0; j < SizeX; j++)
-                {
-                    if (new Random().NextDouble() > 0.85)
-                    {
-                        MinesMap[i][j] = 1;
-                    }
-                }
-            }
-
-            // generate numbers
-            for (var i = 0; i < SizeY; i++)
-            {
-                NumbersMap[i] = new int[SizeX];
-
-                for (var j = 0; j < SizeX; j++)
-                {
-                    if (MinesMap[i][j] == 1)
-                    {
-                        continue;
-                    }
-
-                    var minesNumber = 0;
-
-                    for (int di = -1; di <= 1; di++)
-                    {
-                        for (int dj = -1; dj <= 1; dj++)
-                        {
-                            if (i + di >= 0 && i + di < SizeY && j + dj >= 0 && j + dj < SizeX && MinesMap[i + di][j + dj] == 1)
-                            {
-                                minesNumber++;
-                            }
-                        }
-
-                        NumbersMap[i][j] = minesNumber;
                     }
                 }
             }
