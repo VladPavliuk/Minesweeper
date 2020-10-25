@@ -4,10 +4,10 @@ using System.Linq;
 
 namespace Minesweeper
 {
-    public class MinesweeperGame
+    public class MinesweeperState
     {
-        public readonly int SizeX = 13;
-        public readonly int SizeY = 13;
+        public readonly int SizeX = 10;
+        public readonly int SizeY = 10;
 
         public bool IsRunning { get; private set; } = true;
         public GameResult GameResult { get; private set; } = GameResult.None;
@@ -16,9 +16,11 @@ namespace Minesweeper
         public readonly int[][] NumbersMap;
         public readonly int[][] VisibleMap;
 
+        public (int y, int x) LastMove { get; private set; }
+
         public Action<GameResult> OneGameEnd = delegate { };
 
-        public MinesweeperGame()
+        public MinesweeperState()
         {
             MinesMap = new int[SizeY][];
             NumbersMap = new int[SizeY][];
@@ -28,6 +30,7 @@ namespace Minesweeper
         public void MakeGuess(int y, int x)
         {
             VisibleMap[y][x] = 1;
+            LastMove = (y, x);
 
             if (MinesMap[y][x] == 1)
             {

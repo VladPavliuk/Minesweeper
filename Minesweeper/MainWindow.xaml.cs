@@ -1,5 +1,7 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using Newtonsoft.Json;
+using System.IO;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -16,25 +18,32 @@ namespace Minesweeper
         public int XUnit;
         public int YUnit;
 
-        public MinesweeperGame ActiveGame { get; set; }
+        public MinesweeperState ActiveGame { get; set; }
 
         public MainWindow()
         {
-            ActiveGame = new MinesweeperGame()
+            ActiveGame = new MinesweeperState()
             {
-                OneGameEnd = gameResult =>
-                {
-                    DrawMap();
-                    DrawMines();
-                    if (gameResult == GameResult.Win)
-                    {
-                        MessageBox.Show("Win!");
-                    }
-                    else if (gameResult == GameResult.Loose)
-                    {
-                        MessageBox.Show("Loose!");
-                    }
-                }
+                //OneGameEnd = gameResult =>
+                //{
+                //    Dispatcher.Invoke(() =>
+                //    {
+                //        DrawMap();
+                //        DrawMines();
+                //    });
+                //    if (gameResult == GameResult.Win)
+                //    {
+                //        //Debug.WriteLine("Win!");
+                //        MessageBox.Show("Win!");
+                //    }
+                //    else if (gameResult == GameResult.Loose)
+                //    {
+                //        //Debug.WriteLine("Loose!");
+                //        MessageBox.Show("Loose!");
+                //    }
+
+                //    ActiveGame.Initialize();
+                //}
             };
 
             InitializeComponent();
@@ -42,7 +51,65 @@ namespace Minesweeper
             YUnit = (int)CanvasElement.Height / ActiveGame.SizeY;
 
             ActiveGame.Initialize();
-            DrawMap();
+
+            var updateFileIterator = 10;
+            var neuralNetworkDataFilePath = "../../../NeuralNetworkData.txt";
+            var network = new MinesweeperNetwork(ActiveGame);
+
+            try
+            {
+                var neuralNetworkDataText = File.ReadAllText(neuralNetworkDataFilePath);
+
+                var neuralNetworkData = JsonConvert.DeserializeObject<NeuralNetworkData>(neuralNetworkDataText);
+
+                // Keep in mind these arrays are copied by the reference.
+                network.NeuralNetwork.Weights = neuralNetworkData.Weights;
+                network.NeuralNetwork.Bias = neuralNetworkData.Bias;
+            }
+            catch (FileNotFoundException)
+            {
+                File.CreateText(neuralNetworkDataFilePath);
+            }
+
+            Task.Factory.StartNew(() =>
+            {
+                while (ActiveGame.IsRunning)
+                {
+                    //Thread.Sleep(500);
+                    var (y, x) = network.Predict();
+                    ActiveGame.MakeGuess(y, x);
+                    network.Learn();
+
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        DrawMap();
+                    });
+
+                    if (!ActiveGame.IsRunning)
+                    {
+                        updateFileIterator--;
+                        this.Dispatcher.Invoke(() =>
+                        {
+                            DrawMap();
+                            DrawMines();
+                        });
+                        
+                        if (updateFileIterator <= 0)
+                        {
+                            File.WriteAllText(neuralNetworkDataFilePath, JsonConvert.SerializeObject(
+                                new NeuralNetworkData()
+                                {
+                                    Weights = network.NeuralNetwork.Weights,
+                                    Bias = network.NeuralNetwork.Bias,
+                                }
+                            ));
+                            updateFileIterator = 10;
+                        }
+
+                        ActiveGame.Initialize();
+                    }
+                }
+            });
         }
 
         public void Canvas_MouseDown(object sender, MouseButtonEventArgs e)
