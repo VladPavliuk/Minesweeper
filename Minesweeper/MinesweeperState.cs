@@ -6,8 +6,8 @@ namespace Minesweeper
 {
     public class MinesweeperState
     {
-        public readonly int SizeX = 10;
-        public readonly int SizeY = 10;
+        public readonly int SizeX = 12;
+        public readonly int SizeY = 12;
 
         public bool IsRunning { get; private set; } = true;
         public GameResult GameResult { get; private set; } = GameResult.None;
@@ -29,6 +29,11 @@ namespace Minesweeper
 
         public void MakeGuess(int y, int x)
         {
+            if (VisibleMap[y][x] == 1)
+            {
+                return;
+            }
+
             VisibleMap[y][x] = 1;
             LastMove = (y, x);
 

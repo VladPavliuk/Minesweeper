@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json;
+using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +52,7 @@ namespace Minesweeper
             YUnit = (int)CanvasElement.Height / ActiveGame.SizeY;
 
             ActiveGame.Initialize();
+            DrawMap();
 
             var updateFileIterator = 10;
             var neuralNetworkDataFilePath = "../../../NeuralNetworkData.txt";
@@ -73,27 +75,74 @@ namespace Minesweeper
 
             Task.Factory.StartNew(() =>
             {
+                var alreadyOpenSqaureClick = 0;
+
                 while (ActiveGame.IsRunning)
                 {
-                    //Thread.Sleep(500);
                     var (y, x) = network.Predict();
+
+                    if (ActiveGame.VisibleMap[y][x] == 1)
+                    {
+                        alreadyOpenSqaureClick++;
+
+                        if (alreadyOpenSqaureClick > 5)
+                        {
+                            alreadyOpenSqaureClick = 0;
+                            ActiveGame.Initialize();
+                            continue;
+                        }
+                    }
+
                     ActiveGame.MakeGuess(y, x);
-                    network.Learn();
+                    var (training, outputs) = network.Learn();
 
                     this.Dispatcher.Invoke(() =>
                     {
                         DrawMap();
                     });
 
+                    //> draw training data
+                    for (int i = 0; i < training.Length; i++)
+                    {
+                        var yT = i / ActiveGame.SizeY;
+                        var xT = i % ActiveGame.SizeX;
+                        this.Dispatcher.Invoke(() =>
+                        {
+                            var number = new TextBlock()
+                            {
+                                Text = Math.Round(training[i] * 1000.0d).ToString(),
+                                Foreground = new SolidColorBrush(Colors.Green),
+                                FontSize = 12
+                            };
+
+                            Canvas.SetTop(number, yT * YUnit + 4);
+                            Canvas.SetLeft(number, xT * XUnit + 5);
+                            CanvasElement.Children.Add(number);
+
+                            var number2 = new TextBlock()
+                            {
+                                Text = Math.Round(outputs[i] * 1000.0d).ToString(),
+                                Foreground = new SolidColorBrush(Colors.Purple),
+                                FontSize = 12
+                            };
+
+                            Canvas.SetTop(number2, yT * YUnit + 15);
+                            Canvas.SetLeft(number2, xT * XUnit + 5);
+                            CanvasElement.Children.Add(number2);
+                        });
+                    }
+                    //<
+                    Thread.Sleep(500);
+
                     if (!ActiveGame.IsRunning)
                     {
                         updateFileIterator--;
                         this.Dispatcher.Invoke(() =>
                         {
-                            DrawMap();
-                            DrawMines();
+                            //DrawMap();
+                            //DrawMines();
                         });
-                        
+
                         if (updateFileIterator <= 0)
                         {
                             File.WriteAllText(neuralNetworkDataFilePath, JsonConvert.SerializeObject(
