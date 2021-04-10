@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="Minesweeper" Height="460" Width="420" ResizeMode="NoResize">
     <Grid>
-        <Canvas x:Name="CanvasElement" Height="400" Width="400" MouseLeftButtonDown="Canvas_MouseDown" Background="White" Margin="10,24,10,10"/>
+        <Canvas x:Name="CanvasElement" Height="400" Width="400" MouseRightButtonDown="Canvas_Right_MouseDown" MouseLeftButtonDown="Canvas_Left_MouseDown" Background="White" Margin="10,24,10,10"/>
         <Button Content="Restart" HorizontalAlignment="Center" Margin="0,2,0,0" VerticalAlignment="Top" Click="Restart_Click" />
     </Grid>
 </Window>

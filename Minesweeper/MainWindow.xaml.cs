@@ -25,26 +25,26 @@ namespace Minesweeper
         {
             ActiveGame = new MinesweeperState()
             {
-                //OneGameEnd = gameResult =>
-                //{
-                //    Dispatcher.Invoke(() =>
-                //    {
-                //        DrawMap();
-                //        DrawMines();
-                //    });
-                //    if (gameResult == GameResult.Win)
-                //    {
-                //        //Debug.WriteLine("Win!");
-                //        MessageBox.Show("Win!");
-                //    }
-                //    else if (gameResult == GameResult.Loose)
-                //    {
-                //        //Debug.WriteLine("Loose!");
-                //        MessageBox.Show("Loose!");
-                //    }
+                OneGameEnd = gameResult =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        DrawMap();
+                        DrawMines();
+                    });
+                    if (gameResult == GameResult.Win)
+                    {
+                        //Debug.WriteLine("Win!");
+                        MessageBox.Show("Win!");
+                    }
+                    else if (gameResult == GameResult.Loose)
+                    {
+                        //Debug.WriteLine("Loose!");
+                        MessageBox.Show("Loose!");
+                    }
 
-                //    ActiveGame.Initialize();
-                //}
+                    ActiveGame.Initialize();
+                }
             };
 
             InitializeComponent();
@@ -54,7 +54,12 @@ namespace Minesweeper
             ActiveGame.Initialize();
             DrawMap();
 
-            var updateFileIterator = 10;
+            //DoML();
+        }
+
+        public void DoML()
+        {
+            var updateFileIterator = 100000;
             var neuralNetworkDataFilePath = "../../../NeuralNetworkData.txt";
             var network = new MinesweeperNetwork(ActiveGame);
 
@@ -75,31 +80,58 @@ namespace Minesweeper
 
             Task.Factory.StartNew(() =>
             {
-                var alreadyOpenSqaureClick = 0;
-
-                while (ActiveGame.IsRunning)
+                while (true)
                 {
                     var (y, x) = network.Predict();
 
-                    if (ActiveGame.VisibleMap[y][x] == 1)
-                    {
-                        alreadyOpenSqaureClick++;
+                    //if (ActiveGame.VisibleMap[y][x] == 1)
+                    //{
+                    //    alreadyOpenSqaureClick++;
 
-                        if (alreadyOpenSqaureClick > 5)
-                        {
-                            alreadyOpenSqaureClick = 0;
-                            ActiveGame.Initialize();
-                            continue;
-                        }
+                    //    if (alreadyOpenSqaureClick > 5)
+                    //    {
+                    //        alreadyOpenSqaureClick = 0;
+                    //        ActiveGame.Initialize();
+                    //        continue;
+                    //    }
+                    //}
+
+                    var isFirstMove = ActiveGame.IsFirstMove;
+                    ActiveGame.MakeGuess(y, x);
+
+                    if (isFirstMove)
+                    {
+                        continue;
                     }
 
-                    ActiveGame.MakeGuess(y, x);
                     var (training, outputs) = network.Learn();
 
                     this.Dispatcher.Invoke(() =>
                     {
                         DrawMap();
                     });
+
+                    if (!ActiveGame.IsRunning)
+                    {
+                        updateFileIterator--;
+                        this.Dispatcher.Invoke(() =>
+                        {
+                            DrawMap();
+                            DrawMines();
+                        });
+
+                        if (updateFileIterator <= 0)
+                        {
+                            File.WriteAllText(neuralNetworkDataFilePath, JsonConvert.SerializeObject(
+                                new NeuralNetworkData()
+                                {
+                                    Weights = network.NeuralNetwork.Weights,
+                                    Bias = network.NeuralNetwork.Bias,
+                                }
+                            ));
+                            updateFileIterator = 100000;
+                        }
+                    }
 
                     //> draw training data
                     for (int i = 0; i < training.Length; i++)
@@ -132,36 +164,37 @@ namespace Minesweeper
                         });
                     }
                     //<
-                    Thread.Sleep(500);
+                    Thread.Sleep(3000);
 
                     if (!ActiveGame.IsRunning)
                     {
-                        updateFileIterator--;
-                        this.Dispatcher.Invoke(() =>
-                        {
-                            //DrawMap();
-                            //DrawMines();
-                        });
-
-                        if (updateFileIterator <= 0)
-                        {
-                            File.WriteAllText(neuralNetworkDataFilePath, JsonConvert.SerializeObject(
-                                new NeuralNetworkData()
-                                {
-                                    Weights = network.NeuralNetwork.Weights,
-                                    Bias = network.NeuralNetwork.Bias,
-                                }
-                            ));
-                            updateFileIterator = 10;
-                        }
-
                         ActiveGame.Initialize();
                     }
                 }
             });
         }
 
-        public void Canvas_MouseDown(object sender, MouseButtonEventArgs e)
+        public void Canvas_Right_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (!ActiveGame.IsRunning)
+            {
+                return;
+            }
+
+            var clickedPoint = Mouse.GetPosition(CanvasElement);
+
+            var y = (int)(clickedPoint.Y * ActiveGame.SizeY / CanvasElement.Height);
+            var x = (int)(clickedPoint.X * ActiveGame.SizeX / CanvasElement.Width);
+
+            ActiveGame.AddExpectedMine(y, x);
+
+            if (ActiveGame.IsRunning)
+            {
+                DrawMap();
+            }
+        }
+
+        public void Canvas_Left_MouseDown(object sender, MouseButtonEventArgs e)
         {
             if (!ActiveGame.IsRunning)
             {
@@ -211,6 +244,27 @@ namespace Minesweeper
                         Canvas.SetLeft(invisibleBlock, j * XUnit);
 
                         CanvasElement.Children.Add(invisibleBlock);
+                    }
+                }
+            }
+
+            // draw expected mines
+            for (var i = 0; i < ActiveGame.SizeY; i++)
+            {
+                for (var j = 0; j < ActiveGame.SizeX; j++)
+                {
+                    if (ActiveGame.ExpectedMines[i][j] == 1)
+                    {
+                        var expectedMine = new Rectangle()
+                        {
+                            Fill = new SolidColorBrush(Colors.Purple),
+                            Width = XUnit / 2,
+                            Height = YUnit / 2
+                        };
+                        Canvas.SetTop(expectedMine, i * YUnit + XUnit / 4);
+                        Canvas.SetLeft(expectedMine, j * XUnit + XUnit / 4);
+
+                        CanvasElement.Children.Add(expectedMine);
                     }
                 }
             }

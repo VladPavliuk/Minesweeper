@@ -6,8 +6,9 @@ namespace Minesweeper
 {
     public class MinesweeperState
     {
-        public readonly int SizeX = 12;
-        public readonly int SizeY = 12;
+        public readonly int SizeX = 6;
+        public readonly int SizeY = 6;
+        public bool IsFirstMove { get; private set; } = true;
 
         public bool IsRunning { get; private set; } = true;
         public GameResult GameResult { get; private set; } = GameResult.None;
@@ -15,6 +16,7 @@ namespace Minesweeper
         public readonly int[][] MinesMap;
         public readonly int[][] NumbersMap;
         public readonly int[][] VisibleMap;
+        public readonly int[][] ExpectedMines;
 
         public (int y, int x) LastMove { get; private set; }
 
@@ -22,9 +24,18 @@ namespace Minesweeper
 
         public MinesweeperState()
         {
+            ExpectedMines = new int[SizeY][];
             MinesMap = new int[SizeY][];
             NumbersMap = new int[SizeY][];
             VisibleMap = new int[SizeY][];
+        }
+
+        public void AddExpectedMine(int y, int x)
+        {
+            if (VisibleMap[y][x] == 0)
+            {
+                ExpectedMines[y][x] = ExpectedMines[y][x] == 1 ? 0 : 1;
+            }
         }
 
         public void MakeGuess(int y, int x)
@@ -35,19 +46,18 @@ namespace Minesweeper
             }
 
             VisibleMap[y][x] = 1;
+            ExpectedMines[y][x] = 0;
             LastMove = (y, x);
 
             if (MinesMap[y][x] == 1)
             {
+                if (IsFirstMove)
+                {
+                    Initialize();
+                    MakeGuess(y, x);
+                    return;
+                }
                 GameResult = GameResult.Loose;
-            }
-            else if (isWin())
-            {
-                GameResult = GameResult.Win;
-            }
-
-            if (GameResult != GameResult.None)
-            {
                 IsRunning = false;
                 OneGameEnd(GameResult);
                 return;
@@ -77,7 +87,24 @@ namespace Minesweeper
                 }
 
                 VisibleMap[square.y][square.x] = 1;
+                ExpectedMines[square.y][square.x] = 0;
             }
+
+            if (isWin())
+            {
+                GameResult = GameResult.Win;
+                IsRunning = false;
+                OneGameEnd(GameResult);
+                return;
+            }
+
+            if (IsFirstMove && VisibleMap.SelectMany(_ => _).Count(v => v == 1) <= 12)
+            {
+                Initialize();
+                MakeGuess(y, x);
+                return;
+            }
+            IsFirstMove = false;
         }
 
         private List<(int y, int x)> GetClosedEmptySquares(int y, int x, List<(int y, int x)> visited = null)
@@ -126,6 +153,7 @@ namespace Minesweeper
         public void Initialize()
         {
             IsRunning = true;
+            IsFirstMove = true;
             GameResult = GameResult.None;
 
             // reset visibility
@@ -135,17 +163,27 @@ namespace Minesweeper
             }
 
             // generate mines
+            var minesCount = 0;
             for (var i = 0; i < SizeY; i++)
             {
+                ExpectedMines[i] = new int[SizeX];
                 MinesMap[i] = new int[SizeX];
 
                 for (var j = 0; j < SizeX; j++)
                 {
+                    ExpectedMines[i][j] = 0;
                     if (new Random().NextDouble() > 0.85)
                     {
                         MinesMap[i][j] = 1;
+                        minesCount++;
                     }
                 }
+            }
+
+            if (minesCount == 0)
+            {
+                Initialize();
+                return;
             }
 
             // generate numbers
